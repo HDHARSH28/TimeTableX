@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+Backend/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+Backend/.env
+Backend/.env.*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build and coverage
+coverage/
+.nyc_output/
+dist/
+build/
+
+# Cache and temp
+.cache/
+tmp/
+temp/
+*.tmp
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
