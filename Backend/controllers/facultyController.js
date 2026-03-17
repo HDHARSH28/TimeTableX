@@ -42,3 +42,79 @@ exports.getAllFaculty = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getFacultyById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const faculty = await Faculty.findByPk(id, {
+      include: [{ model: Subject, as: 'subjects', attributes: ['id'] }],
+    });
+
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
+    }
+
+    const data = {
+      id: faculty.id,
+      name: faculty.name,
+      max_classes_per_day: faculty.max_classes_per_day,
+      subject_ids: (faculty.subjects || []).map(s => s.id),
+    };
+
+    res.json({ success: true, data });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateFaculty = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, max_classes_per_day, subject_ids } = req.body;
+
+    const faculty = await Faculty.findByPk(id);
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
+    }
+
+    if (name) faculty.name = name;
+    if (max_classes_per_day) faculty.max_classes_per_day = max_classes_per_day;
+    await faculty.save();
+
+    if (Array.isArray(subject_ids)) {
+      await Subject.update(
+        { faculty_id: null },
+        { where: { faculty_id: id } }
+      );
+      if (subject_ids.length) {
+        await Subject.update(
+          { faculty_id: id },
+          { where: { id: subject_ids } }
+        );
+      }
+    }
+
+    const subjects = await Subject.findAll({ where: { faculty_id: id }, attributes: ['id'] });
+    res.json({ success: true, data: { ...faculty.toJSON(), subject_ids: subjects.map(s => s.id) } });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteFaculty = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const faculty = await Faculty.findByPk(id);
+
+    if (!faculty) {
+      return res.status(404).json({ success: false, message: 'Faculty not found' });
+    }
+
+    await Subject.update({ faculty_id: null }, { where: { faculty_id: id } });
+    await faculty.destroy();
+
+    res.json({ success: true, message: 'Faculty deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};

@@ -30,3 +30,67 @@ exports.getAllSubjects = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getSubjectById = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const subject = await Subject.findByPk(id, {
+      include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'name'] }],
+    });
+
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    res.json({ success: true, data: subject });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.updateSubject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { name, classes_per_week, faculty_id } = req.body;
+
+    const subject = await Subject.findByPk(id);
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    if (name) subject.name = name;
+    if (classes_per_week) subject.classes_per_week = classes_per_week;
+    if (faculty_id) {
+      const faculty = await Faculty.findByPk(faculty_id);
+      if (!faculty) {
+        return res.status(404).json({ success: false, message: 'Faculty not found' });
+      }
+      subject.faculty_id = faculty_id;
+    }
+
+    await subject.save();
+    const updatedSubject = await Subject.findByPk(id, {
+      include: [{ model: Faculty, as: 'faculty', attributes: ['id', 'name'] }],
+    });
+
+    res.json({ success: true, data: updatedSubject });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteSubject = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const subject = await Subject.findByPk(id);
+
+    if (!subject) {
+      return res.status(404).json({ success: false, message: 'Subject not found' });
+    }
+
+    await subject.destroy();
+    res.json({ success: true, message: 'Subject deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
