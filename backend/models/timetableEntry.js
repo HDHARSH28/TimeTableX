@@ -22,6 +22,10 @@ const TimetableEntry = sequelize.define('TimetableEntry', {
       min: 1,
       max: 10
     }
+  },
+  batch: {
+    type: DataTypes.STRING,
+    allowNull: true
   }
 });
 

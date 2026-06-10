@@ -38,6 +38,11 @@ const Subject = sequelize.define('Subject', {
       min: 1,
       max: 8
     }
+  },
+  type: {
+    type: DataTypes.ENUM('theory', 'lab', 'tutorial', 'both'),
+    allowNull: false,
+    defaultValue: 'theory'
   }
 });
 

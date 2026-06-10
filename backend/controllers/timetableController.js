@@ -6,7 +6,7 @@ const { generateTimetableSchedule } = require('../services/optimizerService');
 // @access  Private/Admin
 const generateTimetable = async (req, res, next) => {
   try {
-    const { name, departmentId, semester, academicYear } = req.body;
+    const { name, departmentId, semester, academicYear, workingDays, slotsPerDay, breaks } = req.body;
 
     if (!name || !departmentId || !semester || !academicYear) {
       return res.status(400).json({
@@ -14,6 +14,10 @@ const generateTimetable = async (req, res, next) => {
         message: 'Please provide name, departmentId, semester, and academicYear'
       });
     }
+
+    const finalWorkingDays = workingDays || '1,2,3,4,5';
+    const finalSlotsPerDay = slotsPerDay ? parseInt(slotsPerDay, 10) : 6;
+    const finalBreaks = breaks || '';
 
     // 1. Check if department exists
     const dept = await Department.findByPk(departmentId);
@@ -61,51 +65,128 @@ const generateTimetable = async (req, res, next) => {
     const optimizerSubjects = [];
     subjects.forEach(s => {
       const assignedFaculties = s.Faculties || [];
-      if (assignedFaculties.length === 0) {
-        // No faculty assigned
-        optimizerSubjects.push({
-          id: s.id,
-          name: s.name,
-          code: s.code,
-          classesPerWeek: s.classesPerWeek,
-          facultyId: null,
-          departmentId: s.departmentId,
-          semester: s.semester
-        });
-      } else if (assignedFaculties.length === 1) {
-        // Exactly one faculty
-        optimizerSubjects.push({
-          id: s.id,
-          name: s.name,
-          code: s.code,
-          classesPerWeek: s.classesPerWeek,
-          facultyId: assignedFaculties[0].id,
-          departmentId: s.departmentId,
-          semester: s.semester
-        });
-      } else {
-        // Split classesPerWeek among co-assigned faculties
-        const F = assignedFaculties.length;
-        const C = s.classesPerWeek;
-        const baseClasses = Math.floor(C / F);
-        const remainder = C % F;
+      
+      if (s.type === 'both') {
+        const theoryClasses = Math.ceil(s.classesPerWeek / 2);
+        const labClasses = s.classesPerWeek - theoryClasses;
         
-        assignedFaculties.forEach((fac, idx) => {
-          const facClasses = baseClasses + (idx < remainder ? 1 : 0);
-          if (facClasses > 0) {
+        // 1. Push Theory part
+        optimizerSubjects.push({
+          id: s.id, // Original ID representing the theory part
+          name: `${s.name} (Theory)`,
+          code: s.code,
+          classesPerWeek: theoryClasses,
+          facultyId: assignedFaculties.length > 0 ? assignedFaculties[0].id : null,
+          departmentId: s.departmentId,
+          semester: s.semester,
+          type: 'theory'
+        });
+
+        // 2. Push Lab part (B1, B2, B3)
+        if (labClasses > 0) {
+          for (let b = 1; b <= 3; b++) {
+            const fac = assignedFaculties.length > 0 
+              ? assignedFaculties[(b - 1) % assignedFaculties.length] 
+              : null;
+            
             optimizerSubjects.push({
-              id: s.id * 1000 + idx, // Unique sub-subject ID for optimizer
-              name: `${s.name} (${fac.name})`,
+              id: s.id * 10000 + b,
+              name: `${s.name} (B${b})`,
               code: s.code,
-              classesPerWeek: facClasses,
-              facultyId: fac.id,
+              classesPerWeek: labClasses,
+              facultyId: fac ? fac.id : null,
               departmentId: s.departmentId,
-              semester: s.semester
+              semester: s.semester,
+              type: 'lab'
             });
           }
-        });
+        }
+      } else if (s.type === 'lab') {
+        // Generate 3 batches: B1, B2, B3
+        for (let b = 1; b <= 3; b++) {
+          const fac = assignedFaculties.length > 0 
+            ? assignedFaculties[(b - 1) % assignedFaculties.length] 
+            : null;
+          
+          optimizerSubjects.push({
+            id: s.id * 10000 + b,
+            name: `${s.name} (B${b})`,
+            code: s.code,
+            classesPerWeek: s.classesPerWeek,
+            facultyId: fac ? fac.id : null,
+            departmentId: s.departmentId,
+            semester: s.semester,
+            type: 'lab'
+          });
+        }
+      } else {
+        // Theory or Tutorial
+        const sType = s.type || 'theory';
+        if (assignedFaculties.length === 0) {
+          optimizerSubjects.push({
+            id: s.id,
+            name: s.name,
+            code: s.code,
+            classesPerWeek: s.classesPerWeek,
+            facultyId: null,
+            departmentId: s.departmentId,
+            semester: s.semester,
+            type: sType
+          });
+        } else if (assignedFaculties.length === 1) {
+          optimizerSubjects.push({
+            id: s.id,
+            name: s.name,
+            code: s.code,
+            classesPerWeek: s.classesPerWeek,
+            facultyId: assignedFaculties[0].id,
+            departmentId: s.departmentId,
+            semester: s.semester,
+            type: sType
+          });
+        } else {
+          // Split classesPerWeek among co-assigned faculties
+          const F = assignedFaculties.length;
+          const C = s.classesPerWeek;
+          const baseClasses = Math.floor(C / F);
+          const remainder = C % F;
+          
+          assignedFaculties.forEach((fac, idx) => {
+            const facClasses = baseClasses + (idx < remainder ? 1 : 0);
+            if (facClasses > 0) {
+              optimizerSubjects.push({
+                id: s.id * 10000 + 10 + idx, // Unique sub-subject ID for optimizer
+                name: `${s.name} (${fac.name})`,
+                code: s.code,
+                classesPerWeek: facClasses,
+                facultyId: fac.id,
+                departmentId: s.departmentId,
+                semester: s.semester,
+                type: sType
+              });
+            }
+          });
+        }
       }
     });
+
+    const facultyAvailability = {};
+    allAssignedFaculty.forEach(f => {
+      const fDays = f.workingDays || '1,2,3,4,5';
+      facultyAvailability[f.id] = fDays.split(',').map(d => parseInt(d, 10));
+    });
+
+    const parsedWorkingDays = finalWorkingDays.split(',').map(d => parseInt(d, 10));
+    const parsedBreaks = finalBreaks.trim() ? finalBreaks.split(',').map(b => parseInt(b, 10)) : [];
+
+    for (const b of parsedBreaks) {
+      if (b <= 1 || b >= finalSlotsPerDay) {
+        return res.status(400).json({
+          success: false,
+          message: `Breaks cannot be placed at the start (Period 1) or end (Period ${finalSlotsPerDay}) of the day. They must be scheduled in the middle.`
+        });
+      }
+    }
 
     const optimizerPayload = {
       subjects: optimizerSubjects,
@@ -120,8 +201,11 @@ const generateTimetable = async (req, res, next) => {
         capacity: c.capacity,
         type: c.type
       })),
-      days: 5,
-      slots_per_day: 6
+      days: Math.max(...parsedWorkingDays, 5),
+      slots_per_day: finalSlotsPerDay,
+      working_days: parsedWorkingDays,
+      breaks: parsedBreaks,
+      faculty_availability: facultyAvailability
     };
 
     // 6. Call Python Optimizer
@@ -141,20 +225,33 @@ const generateTimetable = async (req, res, next) => {
       departmentId,
       semester,
       academicYear,
-      status: 'draft'
+      status: 'draft',
+      workingDays: finalWorkingDays,
+      slotsPerDay: finalSlotsPerDay,
+      breaks: finalBreaks
     });
 
     // 8. Create TimetableEntries
     const timetableEntries = optimizationResult.schedule.map(entry => {
-      // Map sub-subject ID back to original subject ID
-      const originalSubjectId = entry.subject_id >= 1000 ? Math.floor(entry.subject_id / 1000) : entry.subject_id;
+      let originalSubjectId = entry.subject_id;
+      let batch = null;
+
+      if (entry.subject_id >= 10000) {
+        originalSubjectId = Math.floor(entry.subject_id / 10000);
+        const rem = entry.subject_id % 10000;
+        if (rem >= 1 && rem <= 3) {
+          batch = `B${rem}`;
+        }
+      }
+
       return {
         timetableId: timetable.id,
         subjectId: originalSubjectId,
         facultyId: entry.faculty_id,
         classroomId: entry.classroom_id,
         dayOfWeek: entry.day_of_week,
-        slotIndex: entry.slot_index
+        slotIndex: entry.slot_index,
+        batch: batch
       };
     });
 
@@ -303,7 +400,7 @@ const exportTimetable = async (req, res, next) => {
     sortedEntries.forEach(entry => {
       const day = dayNames[entry.dayOfWeek] || entry.dayOfWeek;
       const slot = `Period ${entry.slotIndex}`;
-      const code = entry.Subject ? entry.Subject.code : 'N/A';
+      const code = entry.Subject ? (entry.Subject.code + (entry.batch ? `: ${entry.batch}` : '')) : 'N/A';
       const subject = entry.Subject ? entry.Subject.name : 'N/A';
       const faculty = entry.Faculty ? entry.Faculty.name : 'N/A';
       const classroom = entry.Classroom ? entry.Classroom.name : 'N/A';

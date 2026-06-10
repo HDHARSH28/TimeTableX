@@ -43,7 +43,7 @@ const getSubject = async (req, res, next) => {
 // @access  Private/Admin
 const createSubject = async (req, res, next) => {
   try {
-    const { name, code, classesPerWeek, semester, facultyId, facultyIds, departmentId } = req.body;
+    const { name, code, classesPerWeek, semester, facultyId, facultyIds, departmentId, type } = req.body;
 
     // Check department
     const dept = await Department.findByPk(departmentId);
@@ -72,7 +72,8 @@ const createSubject = async (req, res, next) => {
       code,
       classesPerWeek,
       semester,
-      departmentId
+      departmentId,
+      type
     });
 
     if (resolvedFacultyIds.length > 0) {
@@ -98,7 +99,7 @@ const createSubject = async (req, res, next) => {
 // @access  Private/Admin
 const updateSubject = async (req, res, next) => {
   try {
-    const { name, code, classesPerWeek, semester, facultyId, facultyIds, departmentId } = req.body;
+    const { name, code, classesPerWeek, semester, facultyId, facultyIds, departmentId, type } = req.body;
 
     let subject = await Subject.findByPk(req.params.id);
     if (!subject) {
@@ -133,7 +134,8 @@ const updateSubject = async (req, res, next) => {
       code,
       classesPerWeek,
       semester,
-      departmentId
+      departmentId,
+      type
     });
 
     if (resolvedFacultyIds) {

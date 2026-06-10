@@ -19,6 +19,23 @@ export default function Faculty() {
   const [email, setEmail] = useState('');
   const [maxClassesPerDay, setMaxClassesPerDay] = useState(3);
   const [departmentId, setDepartmentId] = useState('');
+  const [workingDays, setWorkingDays] = useState(['1', '2', '3', '4', '5']);
+
+  const dayOptions = [
+    { value: '1', label: 'Mon' },
+    { value: '2', label: 'Tue' },
+    { value: '3', label: 'Wed' },
+    { value: '4', label: 'Thu' },
+    { value: '5', label: 'Fri' },
+    { value: '6', label: 'Sat' },
+    { value: '7', label: 'Sun' }
+  ];
+
+  const formatWorkingDays = (daysStr) => {
+    if (!daysStr) return 'N/A';
+    const dayMap = { '1': 'Mon', '2': 'Tue', '3': 'Wed', '4': 'Thu', '5': 'Fri', '6': 'Sat', '7': 'Sun' };
+    return daysStr.split(',').map(d => dayMap[d] || d).join(', ');
+  };
 
   const currentUser = authAPI.getCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
@@ -50,6 +67,7 @@ export default function Faculty() {
     setName('');
     setEmail('');
     setMaxClassesPerDay(3);
+    setWorkingDays(['1', '2', '3', '4', '5']);
     if (departments.length > 0) {
       setDepartmentId(departments[0].id.toString());
     } else {
@@ -64,6 +82,7 @@ export default function Faculty() {
     setName(fac.name);
     setEmail(fac.email);
     setMaxClassesPerDay(fac.maxClassesPerDay);
+    setWorkingDays(fac.workingDays ? fac.workingDays.split(',') : ['1', '2', '3', '4', '5']);
     setDepartmentId(fac.departmentId ? fac.departmentId.toString() : '');
     setCurrentId(fac.id);
     setIsModalOpen(true);
@@ -83,7 +102,8 @@ export default function Faculty() {
       name,
       email,
       maxClassesPerDay: parseInt(maxClassesPerDay, 10),
-      departmentId: parseInt(departmentId, 10)
+      departmentId: parseInt(departmentId, 10),
+      workingDays: workingDays.join(',')
     };
 
     try {
@@ -196,6 +216,7 @@ export default function Faculty() {
                 <th>Email Address</th>
                 <th>Department</th>
                 <th>Max Classes / Day</th>
+                <th>Working Days</th>
                 {isAdmin && <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>}
               </tr>
             </thead>
@@ -210,6 +231,7 @@ export default function Faculty() {
                     </span>
                   </td>
                   <td style={{ fontWeight: 600 }}>{fac.maxClassesPerDay} periods</td>
+                  <td style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>{formatWorkingDays(fac.workingDays)}</td>
                   {isAdmin && (
                     <td className="actions-cell" style={{ justifyContent: 'center' }}>
                       <button 
@@ -287,6 +309,45 @@ export default function Faculty() {
                   onChange={(e) => setMaxClassesPerDay(e.target.value)}
                   required
                 />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Working Days</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  {dayOptions.map((opt) => {
+                    const isChecked = workingDays.includes(opt.value);
+                    return (
+                      <label key={opt.value} className="badge" style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        cursor: 'pointer',
+                        padding: '6px 12px',
+                        background: isChecked ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.02)',
+                        color: isChecked ? '#60a5fa' : 'var(--text-muted)',
+                        borderColor: isChecked ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.05)',
+                        borderWidth: '1px',
+                        borderStyle: 'solid',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setWorkingDays(workingDays.filter(d => d !== opt.value));
+                            } else {
+                              setWorkingDays([...workingDays, opt.value].sort());
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
 
               <div className="form-group">

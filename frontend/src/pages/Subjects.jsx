@@ -20,6 +20,7 @@ export default function Subjects() {
   const [code, setCode] = useState('');
   const [classesPerWeek, setClassesPerWeek] = useState(3);
   const [semester, setSemester] = useState(1);
+  const [type, setType] = useState('theory'); // 'theory' | 'lab' | 'tutorial'
   const [departmentId, setDepartmentId] = useState('');
   const [selectedFacultyIds, setSelectedFacultyIds] = useState([]);
 
@@ -59,6 +60,7 @@ export default function Subjects() {
     setCode('');
     setClassesPerWeek(3);
     setSemester(1);
+    setType('theory');
     if (departments.length > 0) {
       setDepartmentId(departments[0].id.toString());
     } else {
@@ -75,6 +77,7 @@ export default function Subjects() {
     setCode(sub.code);
     setClassesPerWeek(sub.classesPerWeek);
     setSemester(sub.semester);
+    setType(sub.type || 'theory');
     setDepartmentId(sub.departmentId ? sub.departmentId.toString() : '');
     setSelectedFacultyIds(sub.Faculties ? sub.Faculties.map(f => f.id) : []);
     setCurrentId(sub.id);
@@ -102,7 +105,8 @@ export default function Subjects() {
       classesPerWeek: parseInt(classesPerWeek, 10),
       semester: parseInt(semester, 10),
       departmentId: parseInt(departmentId, 10),
-      facultyIds: selectedFacultyIds
+      facultyIds: selectedFacultyIds,
+      type
     };
 
     try {
@@ -216,6 +220,7 @@ export default function Subjects() {
                 <th>Sem</th>
                 <th>Classes / Week</th>
                 <th>Department</th>
+                <th>Type</th>
                 <th>Assigned Faculty</th>
                 {isAdmin && <th style={{ width: '120px', textAlign: 'center' }}>Actions</th>}
               </tr>
@@ -230,6 +235,18 @@ export default function Subjects() {
                   <td>
                     <span className="badge badge-role" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#60a5fa', borderColor: 'rgba(59, 130, 246, 0.3)' }}>
                       {sub.Department ? sub.Department.code : 'N/A'}
+                    </span>
+                  </td>
+                  <td>
+                    <span 
+                      className="badge" 
+                      style={{ 
+                        background: sub.type === 'lab' ? 'var(--secondary-glow)' : (sub.type === 'both' ? 'rgba(236, 72, 153, 0.1)' : (sub.type === 'tutorial' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(139, 92, 246, 0.1)')), 
+                        color: sub.type === 'lab' ? 'var(--secondary)' : (sub.type === 'both' ? '#ec4899' : (sub.type === 'tutorial' ? '#34d399' : '#c084fc')),
+                        borderColor: sub.type === 'lab' ? 'rgba(20, 184, 166, 0.3)' : (sub.type === 'both' ? 'rgba(236, 72, 153, 0.3)' : (sub.type === 'tutorial' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(139, 92, 246, 0.3)'))
+                      }}
+                    >
+                      {sub.type || 'theory'}
                     </span>
                   </td>
                   <td style={{ fontWeight: 500, color: 'var(--text-main)' }}>
@@ -332,6 +349,22 @@ export default function Subjects() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="sub-type">Subject Type</label>
+                <select
+                  id="sub-type"
+                  className="form-control"
+                  value={type}
+                  onChange={(e) => setType(e.target.value)}
+                  required
+                >
+                  <option value="theory">Theory (Whole Class)</option>
+                  <option value="lab">Lab (3 Batches)</option>
+                  <option value="tutorial">Tutorial</option>
+                  <option value="both">Theory + Lab (Both)</option>
+                </select>
               </div>
 
               <div className="form-group">

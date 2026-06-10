@@ -17,6 +17,19 @@ export default function Timetables() {
   const [departmentId, setDepartmentId] = useState('');
   const [semester, setSemester] = useState(3);
   const [academicYear, setAcademicYear] = useState('2026-2027');
+  const [workingDays, setWorkingDays] = useState(['1', '2', '3', '4', '5']);
+  const [slotsPerDay, setSlotsPerDay] = useState(6);
+  const [breaks, setBreaks] = useState('');
+
+  const dayOptions = [
+    { value: '1', label: 'Mon' },
+    { value: '2', label: 'Tue' },
+    { value: '3', label: 'Wed' },
+    { value: '4', label: 'Thu' },
+    { value: '5', label: 'Fri' },
+    { value: '6', label: 'Sat' },
+    { value: '7', label: 'Sun' }
+  ];
 
   const navigate = useNavigate();
   const currentUser = authAPI.getCurrentUser();
@@ -55,6 +68,9 @@ export default function Timetables() {
     }
     setSemester(3);
     setAcademicYear('2026-2027');
+    setWorkingDays(['1', '2', '3', '4', '5']);
+    setSlotsPerDay(6);
+    setBreaks('');
     setError('');
     setIsModalOpen(true);
   };
@@ -69,13 +85,25 @@ export default function Timetables() {
       return;
     }
 
+    const parsedBreaks = breaks.trim() ? breaks.split(',').map(b => parseInt(b.trim(), 10)) : [];
+    const slotsCount = parseInt(slotsPerDay, 10);
+    for (const b of parsedBreaks) {
+      if (b <= 1 || b >= slotsCount) {
+        setError(`Breaks cannot be placed at the start (Period 1) or end (Period ${slotsCount}) of the day. They must be scheduled in the middle.`);
+        return;
+      }
+    }
+
     setGenerating(true);
     try {
       const response = await timetableAPI.generate({
         name,
         departmentId: parseInt(departmentId, 10),
         semester: parseInt(semester, 10),
-        academicYear
+        academicYear,
+        workingDays: workingDays.join(','),
+        slotsPerDay: parseInt(slotsPerDay, 10),
+        breaks
       });
       setSuccess('Timetable optimized and created successfully!');
       setIsModalOpen(false);
@@ -302,6 +330,73 @@ export default function Timetables() {
                     value={academicYear}
                     onChange={(e) => setAcademicYear(e.target.value)}
                     required
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Working Days</label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
+                  {dayOptions.map((opt) => {
+                    const isChecked = workingDays.includes(opt.value);
+                    return (
+                      <label key={opt.value} className="badge" style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: '6px', 
+                        cursor: 'pointer',
+                        padding: '6px 12px',
+                        background: isChecked ? 'rgba(59, 130, 246, 0.2)' : 'rgba(255, 255, 255, 0.02)',
+                        color: isChecked ? '#60a5fa' : 'var(--text-muted)',
+                        borderColor: isChecked ? 'rgba(59, 130, 246, 0.4)' : 'rgba(255, 255, 255, 0.05)',
+                        borderWidth: '1px',
+                        borderStyle: 'solid',
+                        borderRadius: '20px',
+                        fontSize: '0.85rem'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={() => {
+                            if (isChecked) {
+                              setWorkingDays(workingDays.filter(d => d !== opt.value));
+                            } else {
+                              setWorkingDays([...workingDays, opt.value].sort());
+                            }
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        <span>{opt.label}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="tt-slots">Periods / Day</label>
+                  <input
+                    type="number"
+                    id="tt-slots"
+                    className="form-control"
+                    min="1"
+                    max="10"
+                    value={slotsPerDay}
+                    onChange={(e) => setSlotsPerDay(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="tt-breaks">Break Slots (e.g. 3, 5)</label>
+                  <input
+                    type="text"
+                    id="tt-breaks"
+                    className="form-control"
+                    placeholder="e.g. 3 for slot 3 break"
+                    value={breaks}
+                    onChange={(e) => setBreaks(e.target.value)}
                   />
                 </div>
               </div>

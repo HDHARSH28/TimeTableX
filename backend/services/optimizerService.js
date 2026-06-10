@@ -21,7 +21,12 @@ const generateTimetableSchedule = async (data) => {
   } catch (error) {
     console.error('Error contacting Python optimization service:', error.message);
     if (error.response) {
-      throw new Error(`Optimization Service Error: ${error.response.data.detail || error.response.statusText}`);
+      const detail = error.response.data?.detail || error.response.statusText;
+      if (error.response.status === 422) {
+        throw new Error(detail);
+      } else {
+        throw new Error(`Optimization Service Error: ${detail}`);
+      }
     } else if (error.code === 'ECONNREFUSED') {
       throw new Error('Optimization Service is currently offline. Please ensure the Python service is running.');
     }

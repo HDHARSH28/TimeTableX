@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 class SubjectModel(BaseModel):
     id: int
@@ -9,6 +9,7 @@ class SubjectModel(BaseModel):
     facultyId: Optional[int] = Field(None, alias="facultyId")
     departmentId: int = Field(..., alias="departmentId")
     semester: int
+    type: str = "theory"
 
     class Config:
         populate_by_name = True
@@ -41,6 +42,9 @@ class OptimizeRequest(BaseModel):
     days: int = 5
     slots_per_day: int = 6
     fixed_entries: Optional[List[FixedEntryModel]] = None
+    breaks: Optional[List[int]] = None
+    working_days: Optional[List[int]] = None
+    faculty_availability: Optional[Dict[int, List[int]]] = None
 
 class ScheduledEntry(BaseModel):
     subject_id: int

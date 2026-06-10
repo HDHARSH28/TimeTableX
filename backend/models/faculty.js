@@ -30,6 +30,11 @@ const Faculty = sequelize.define('Faculty', {
       min: 1,
       max: 10
     }
+  },
+  workingDays: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: '1,2,3,4,5'
   }
 });
 

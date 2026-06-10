@@ -183,6 +183,7 @@ const importSubjects = async (req, res, next) => {
       const classesPerWeekVal = parseInt(item.classesPerWeek, 10);
       const semesterVal = parseInt(item.semester, 10);
       const departmentCode = item.departmentCode?.trim();
+      const type = item.type?.trim()?.toLowerCase() || 'theory';
       const facultyEmailsStr = item.facultyEmails || '';
 
       if (!name || !code || isNaN(classesPerWeekVal) || isNaN(semesterVal) || !departmentCode) {
@@ -195,6 +196,10 @@ const importSubjects = async (req, res, next) => {
 
       if (semesterVal < 1 || semesterVal > 8) {
         throw new Error(`Row ${i + 1}: semester must be between 1 and 8.`);
+      }
+
+      if (type !== 'theory' && type !== 'lab' && type !== 'tutorial' && type !== 'both') {
+        throw new Error(`Row ${i + 1}: Invalid subject type "${type}". Type must be "theory", "lab", "tutorial", or "both".`);
       }
 
       // Resolve department by code
@@ -223,6 +228,7 @@ const importSubjects = async (req, res, next) => {
         subject.classesPerWeek = classesPerWeekVal;
         subject.semester = semesterVal;
         subject.departmentId = dept.id;
+        subject.type = type;
         await subject.save({ transaction });
       } else {
         subject = await Subject.create({
@@ -230,7 +236,8 @@ const importSubjects = async (req, res, next) => {
           code,
           classesPerWeek: classesPerWeekVal,
           semester: semesterVal,
-          departmentId: dept.id
+          departmentId: dept.id,
+          type
         }, { transaction });
       }
 

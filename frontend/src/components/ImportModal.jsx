@@ -122,11 +122,11 @@ export default function ImportModal({ isOpen, onClose, onSuccess, type }) {
     },
     subjects: {
       title: 'Subjects / Courses',
-      templateHeaders: ['name', 'code', 'classesPerWeek', 'semester', 'departmentCode', 'facultyEmails'],
+      templateHeaders: ['name', 'code', 'classesPerWeek', 'semester', 'type', 'departmentCode', 'facultyEmails'],
       templateRows: [
-        ['Data Structures & Algorithms', 'CS301', '4', '3', 'CSE', 'turing@cse.edu;hopper@cse.edu'],
-        ['Object Oriented Programming', 'CS302', '4', '3', 'CSE', 'turing@cse.edu'],
-        ['Signals & Systems', 'EE301', '4', '3', 'EE', 'shannon@ee.edu']
+        ['Data Structures & Algorithms', 'CS301', '4', '3', 'theory', 'CSE', 'turing@cse.edu;hopper@cse.edu'],
+        ['Object Oriented Programming', 'CS302', '4', '3', 'theory', 'CSE', 'turing@cse.edu'],
+        ['Signals & Systems', 'EE301', '4', '3', 'theory', 'EE', 'shannon@ee.edu']
       ],
       validateRow: (row) => {
         const errors = [];
@@ -141,6 +141,11 @@ export default function ImportModal({ isOpen, onClose, onSuccess, type }) {
         const sem = parseInt(row.semester, 10);
         if (isNaN(sem) || sem < 1 || sem > 8) {
           errors.push('semester must be a number between 1 and 8');
+        }
+
+        const t = row.type?.trim()?.toLowerCase() || 'theory';
+        if (t !== 'theory' && t !== 'lab' && t !== 'tutorial' && t !== 'both') {
+          errors.push('Type must be either "theory", "lab", "tutorial", or "both"');
         }
         
         if (!row.departmentCode || !row.departmentCode.trim()) {

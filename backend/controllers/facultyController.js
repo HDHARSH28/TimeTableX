@@ -37,7 +37,7 @@ const getFaculty = async (req, res, next) => {
 // @access  Private/Admin
 const createFaculty = async (req, res, next) => {
   try {
-    const { name, email, maxClassesPerDay, departmentId } = req.body;
+    const { name, email, maxClassesPerDay, departmentId, workingDays } = req.body;
 
     // Check if department exists
     const dept = await Department.findByPk(departmentId);
@@ -49,7 +49,8 @@ const createFaculty = async (req, res, next) => {
       name,
       email,
       maxClassesPerDay,
-      departmentId
+      departmentId,
+      workingDays: workingDays || '1,2,3,4,5'
     });
 
     res.status(201).json({ success: true, data: faculty });
@@ -63,7 +64,7 @@ const createFaculty = async (req, res, next) => {
 // @access  Private/Admin
 const updateFaculty = async (req, res, next) => {
   try {
-    const { name, email, maxClassesPerDay, departmentId } = req.body;
+    const { name, email, maxClassesPerDay, departmentId, workingDays } = req.body;
 
     let faculty = await Faculty.findByPk(req.params.id);
     if (!faculty) {
@@ -81,7 +82,8 @@ const updateFaculty = async (req, res, next) => {
       name,
       email,
       maxClassesPerDay,
-      departmentId
+      departmentId,
+      workingDays: workingDays !== undefined ? workingDays : faculty.workingDays
     });
 
     res.status(200).json({ success: true, data: faculty });

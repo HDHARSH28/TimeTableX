@@ -92,29 +92,64 @@ export default function TimetableDetail() {
     );
   }
 
-  // Setup grid parameters
-  const days = [
-    { value: 1, label: 'Monday' },
-    { value: 2, label: 'Tuesday' },
-    { value: 3, label: 'Wednesday' },
-    { value: 4, label: 'Thursday' },
-    { value: 5, label: 'Friday' }
-  ];
+  // Setup dynamic grid parameters based on Timetable configuration
+  const dayLabels = {
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Friday',
+    6: 'Saturday',
+    7: 'Sunday'
+  };
 
-  const slots = [
-    { index: 1, name: 'Period 1', time: '08:30 - 09:30' },
-    { index: 2, name: 'Period 2', time: '09:30 - 10:30' },
-    { index: 3, name: 'Period 3', time: '10:45 - 11:45' },
-    { index: 4, name: 'Period 4', time: '11:45 - 12:45' },
-    { index: 5, name: 'Period 5', time: '13:30 - 14:30' },
-    { index: 6, name: 'Period 6', time: '14:30 - 15:30' }
-  ];
+  const activeWorkingDays = timetable.workingDays 
+    ? timetable.workingDays.split(',').map(d => parseInt(d, 10)) 
+    : [1, 2, 3, 4, 5];
 
-  // Helper to find entry matching day and slot
-  const getEntry = (dayVal, slotIndex) => {
-    return timetable.TimetableEntries?.find(
+  const days = activeWorkingDays.map(val => ({
+    value: val,
+    label: dayLabels[val] || `Day ${val}`
+  }));
+
+  const totalPeriods = timetable.slotsPerDay || 6;
+  const breaksList = timetable.breaks 
+    ? timetable.breaks.split(',').map(b => parseInt(b, 10)) 
+    : [];
+
+  const getTimeForPeriod = (pIndex) => {
+    const times = {
+      1: '08:30 - 09:30',
+      2: '09:30 - 10:30',
+      3: '10:45 - 11:45',
+      4: '11:45 - 12:45',
+      5: '13:30 - 14:30',
+      6: '14:30 - 15:30',
+      7: '15:30 - 16:30',
+      8: '16:30 - 17:30',
+      9: '17:30 - 18:30',
+      10: '18:30 - 19:30'
+    };
+    if (times[pIndex]) return times[pIndex];
+    const hr = 8 + pIndex;
+    return `${String(hr).padStart(2, '0')}:30 - ${String(hr + 1).padStart(2, '0')}:30`;
+  };
+
+  const slots = [];
+  for (let i = 1; i <= totalPeriods; i++) {
+    slots.push({
+      index: i,
+      name: breaksList.includes(i) ? 'BREAK' : `Period ${i}`,
+      time: getTimeForPeriod(i),
+      isBreak: breaksList.includes(i)
+    });
+  }
+
+  // Helper to find entries matching day and slot
+  const getEntries = (dayVal, slotIndex) => {
+    return timetable.TimetableEntries?.filter(
       (entry) => entry.dayOfWeek === dayVal && entry.slotIndex === slotIndex
-    );
+    ) || [];
   };
 
   return (
@@ -198,7 +233,7 @@ export default function TimetableDetail() {
 
       {/* Timetable Schedule Grid */}
       <div className="timetable-grid-container">
-        <div className="timetable-schedule-grid">
+        <div className="timetable-schedule-grid" style={{ gridTemplateColumns: `120px repeat(${days.length}, minmax(180px, 1fr))` }}>
           {/* Header row corner */}
           <div className="timetable-cell timetable-header-cell" style={{ background: 'transparent', borderColor: 'transparent' }}>
             Time Slots
@@ -215,47 +250,87 @@ export default function TimetableDetail() {
           {slots.map((slot) => (
             <React.Fragment key={slot.index}>
               {/* Row Header (Time Slot details) */}
-              <div className="timetable-cell time-slot-header">
-                <span style={{ fontWeight: 700, color: '#fff' }}>{slot.name}</span>
+              <div 
+                className="timetable-cell time-slot-header" 
+                style={slot.isBreak ? { minHeight: '60px', borderLeftColor: 'var(--warning)', background: 'rgba(245, 158, 11, 0.05)' } : {}}
+              >
+                <span style={{ fontWeight: 700, color: slot.isBreak ? 'var(--warning)' : '#fff' }}>{slot.name}</span>
                 <span className="slot-time">{slot.time}</span>
               </div>
 
-              {/* Day cells */}
-              {days.map((day) => {
-                const entry = getEntry(day.value, slot.index);
-                
-                if (entry) {
-                  const isLab = entry.Classroom?.type === 'lab';
-                  return (
-                    <div 
-                      key={`${day.value}-${slot.index}`} 
-                      className={`timetable-cell entry-card ${isLab ? 'entry-card-lab' : ''}`}
-                    >
-                      <div className="entry-subject-code">{entry.Subject?.code}</div>
-                      <div className="entry-subject-name" title={entry.Subject?.name}>{entry.Subject?.name}</div>
-                      
-                      <div className="entry-meta-item">
-                        <User className="entry-meta-icon" />
-                        <span>{entry.Faculty?.name}</span>
+              {slot.isBreak ? (
+                <div 
+                  className="timetable-cell break-cell animate-fade-in"
+                  style={{ 
+                    gridColumn: `span ${days.length}`,
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    background: 'rgba(245, 158, 11, 0.03)', 
+                    borderColor: 'rgba(245, 158, 11, 0.15)',
+                    color: 'var(--warning)',
+                    fontWeight: 700,
+                    fontSize: '0.95rem',
+                    letterSpacing: '0.2em',
+                    minHeight: '60px',
+                    boxShadow: 'inset 0 0 12px rgba(245, 158, 11, 0.02)',
+                    textShadow: '0 0 8px rgba(245, 158, 11, 0.2)'
+                  }}
+                >
+                  ☕ RECESS / LUNCH BREAK
+                </div>
+              ) : (
+                days.map((day) => {
+                  const entries = getEntries(day.value, slot.index);
+                  
+                  if (entries.length > 0) {
+                    return (
+                      <div 
+                        key={`${day.value}-${slot.index}`} 
+                        className="timetable-cell entries-cell"
+                        style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '8px', minHeight: '100px' }}
+                      >
+                        {entries.map((entry, entryIdx) => {
+                          const isLab = entry.Classroom?.type === 'lab';
+                          return (
+                            <div 
+                              key={entry.id || entryIdx} 
+                              className={`entry-card ${isLab ? 'entry-card-lab' : ''}`}
+                              style={{ width: '100%', margin: 0 }}
+                            >
+                              <div className="entry-subject-code">
+                                {entry.Subject?.code}{entry.batch ? `: ${entry.batch}` : ''}
+                              </div>
+                              <div className="entry-subject-name" title={entry.Subject?.name}>
+                                {entry.Subject?.name}
+                              </div>
+                              
+                              <div className="entry-meta-item">
+                                <User className="entry-meta-icon" />
+                                <span>{entry.Faculty?.name}</span>
+                              </div>
+                              
+                              <div className="entry-meta-item">
+                                <GraduationCap className="entry-meta-icon" />
+                                <span>{entry.Classroom?.name} ({entry.Classroom?.capacity})</span>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                      
-                      <div className="entry-meta-item">
-                        <GraduationCap className="entry-meta-icon" />
-                        <span>{entry.Classroom?.name} ({entry.Classroom?.capacity})</span>
+                    );
+                  } else {
+                    return (
+                      <div 
+                        key={`${day.value}-${slot.index}`} 
+                        className="timetable-cell entry-empty"
+                      >
+                        Free Period
                       </div>
-                    </div>
-                  );
-                } else {
-                  return (
-                    <div 
-                      key={`${day.value}-${slot.index}`} 
-                      className="timetable-cell entry-empty"
-                    >
-                      Free Period
-                    </div>
-                  );
-                }
-              })}
+                    );
+                  }
+                })
+              )}
             </React.Fragment>
           ))}
         </div>

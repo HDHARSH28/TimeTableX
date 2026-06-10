@@ -33,6 +33,21 @@ const Timetable = sequelize.define('Timetable', {
     type: DataTypes.ENUM('draft', 'published'),
     allowNull: false,
     defaultValue: 'draft'
+  },
+  workingDays: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: '1,2,3,4,5'
+  },
+  slotsPerDay: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 6
+  },
+  breaks: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: ''
   }
 });
 
