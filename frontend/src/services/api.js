@@ -192,3 +192,23 @@ export const timetableAPI = {
     link.remove();
   }
 };
+
+export const importAPI = {
+  departments: async (data) => {
+    const res = await api.post('/api/import/departments', { data });
+    return res;
+  },
+  classrooms: async (data) => {
+    const res = await api.post('/api/import/classrooms', { data });
+    return res;
+  },
+  faculty: async (data) => {
+    const res = await api.post('/api/import/faculty', { data });
+    return res;
+  },
+  subjects: async (data) => {
+    const res = await api.post('/api/import/subjects', { data });
+    return res;
+  }
+};
+

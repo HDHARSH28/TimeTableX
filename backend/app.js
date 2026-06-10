@@ -13,6 +13,7 @@ const subjectRoutes = require('./routes/subjectRoutes');
 const classroomRoutes = require('./routes/classroomRoutes');
 const timetableRoutes = require('./routes/timetableRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const importRoutes = require('./routes/importRoutes');
 
 const app = express();
 
@@ -34,6 +35,7 @@ app.use('/api/subjects', subjectRoutes);
 app.use('/api/classrooms', classroomRoutes);
 app.use('/api/timetables', timetableRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/import', importRoutes);
 
 // Base route
 app.get('/', (req, res) => {

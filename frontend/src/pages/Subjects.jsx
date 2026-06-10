@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, BookOpen, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, BookOpen, AlertTriangle, X, Upload } from 'lucide-react';
 import { subjectAPI, departmentAPI, facultyAPI, authAPI } from '../services/api';
+import ImportModal from '../components/ImportModal';
 
 export default function Subjects() {
   const [subjects, setSubjects] = useState([]);
@@ -12,6 +13,7 @@ export default function Subjects() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
   const [currentId, setCurrentId] = useState(null);
   const [name, setName] = useState('');
@@ -141,14 +143,16 @@ export default function Subjects() {
           <p className="page-desc">Manage curriculums, semesters, and teacher assignments</p>
         </div>
         {isAdmin && (
-          <button 
-            onClick={handleOpenCreateModal} 
-            className="btn btn-primary"
-            disabled={departments.length === 0 || faculties.length === 0}
-          >
-            <Plus size={18} />
-            <span>Add Subject</span>
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => setIsImportModalOpen(true)} className="btn btn-outline" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Upload size={18} />
+              <span>Import CSV</span>
+            </button>
+            <button onClick={handleOpenCreateModal} className="btn btn-primary" style={{ display: 'flex', gap: '8px', alignItems: 'center' }} disabled={departments.length === 0 || faculties.length === 0}>
+              <Plus size={18} />
+              <span>Add Subject</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -410,6 +414,14 @@ export default function Subjects() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchData}
+        type="subjects"
+      />
     </div>
   );
 }

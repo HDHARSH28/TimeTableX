@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, GraduationCap, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, GraduationCap, AlertTriangle, X, Upload } from 'lucide-react';
 import { classroomAPI, authAPI } from '../services/api';
+import ImportModal from '../components/ImportModal';
 
 export default function Classrooms() {
   const [classrooms, setClassrooms] = useState([]);
@@ -10,6 +11,7 @@ export default function Classrooms() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
   const [currentId, setCurrentId] = useState(null);
   const [name, setName] = useState('');
@@ -107,10 +109,16 @@ export default function Classrooms() {
           <p className="page-desc">Manage physical lecture halls and laboratory locations</p>
         </div>
         {isAdmin && (
-          <button onClick={handleOpenCreateModal} className="btn btn-primary">
-            <Plus size={18} />
-            <span>Add Classroom</span>
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => setIsImportModalOpen(true)} className="btn btn-outline" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Upload size={18} />
+              <span>Import CSV</span>
+            </button>
+            <button onClick={handleOpenCreateModal} className="btn btn-primary" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Plus size={18} />
+              <span>Add Classroom</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -277,6 +285,14 @@ export default function Classrooms() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchClassrooms}
+        type="classrooms"
+      />
     </div>
   );
 }

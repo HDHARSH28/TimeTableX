@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Users, AlertTriangle, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, AlertTriangle, X, Upload } from 'lucide-react';
 import { facultyAPI, departmentAPI, authAPI } from '../services/api';
+import ImportModal from '../components/ImportModal';
 
 export default function Faculty() {
   const [faculties, setFaculties] = useState([]);
@@ -11,6 +12,7 @@ export default function Faculty() {
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState('create'); // 'create' | 'edit'
   const [currentId, setCurrentId] = useState(null);
   const [name, setName] = useState('');
@@ -122,10 +124,16 @@ export default function Faculty() {
           <p className="page-desc">Manage teachers and set daily lesson limits</p>
         </div>
         {isAdmin && (
-          <button onClick={handleOpenCreateModal} className="btn btn-primary" disabled={departments.length === 0}>
-            <Plus size={18} />
-            <span>Add Faculty</span>
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => setIsImportModalOpen(true)} className="btn btn-outline" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Upload size={18} />
+              <span>Import CSV</span>
+            </button>
+            <button onClick={handleOpenCreateModal} className="btn btn-primary" style={{ display: 'flex', gap: '8px', alignItems: 'center' }} disabled={departments.length === 0}>
+              <Plus size={18} />
+              <span>Add Faculty</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -314,6 +322,14 @@ export default function Faculty() {
           </div>
         </div>
       )}
+
+      {/* Bulk Import Modal */}
+      <ImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        onSuccess={fetchData}
+        type="faculty"
+      />
     </div>
   );
 }
