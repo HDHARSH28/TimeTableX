@@ -20,6 +20,8 @@ export default function Timetables() {
   const [workingDays, setWorkingDays] = useState(['1', '2', '3', '4', '5']);
   const [slotsPerDay, setSlotsPerDay] = useState(6);
   const [breaks, setBreaks] = useState('');
+  const [startTime, setStartTime] = useState('08:30');
+  const [slotDuration, setSlotDuration] = useState(60);
 
   const dayOptions = [
     { value: '1', label: 'Mon' },
@@ -71,6 +73,8 @@ export default function Timetables() {
     setWorkingDays(['1', '2', '3', '4', '5']);
     setSlotsPerDay(6);
     setBreaks('');
+    setStartTime('08:30');
+    setSlotDuration(60);
     setError('');
     setIsModalOpen(true);
   };
@@ -103,7 +107,9 @@ export default function Timetables() {
         academicYear,
         workingDays: workingDays.join(','),
         slotsPerDay: parseInt(slotsPerDay, 10),
-        breaks
+        breaks,
+        startTime,
+        slotDuration: parseInt(slotDuration, 10)
       });
       setSuccess('Timetable optimized and created successfully!');
       setIsModalOpen(false);
@@ -370,6 +376,34 @@ export default function Timetables() {
                       </label>
                     );
                   })}
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="tt-start-time">Class Start Time</label>
+                  <input
+                    type="time"
+                    id="tt-start-time"
+                    className="form-control"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="tt-duration">Period Duration (mins)</label>
+                  <input
+                    type="number"
+                    id="tt-duration"
+                    className="form-control"
+                    min="15"
+                    max="180"
+                    value={slotDuration}
+                    onChange={(e) => setSlotDuration(e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 

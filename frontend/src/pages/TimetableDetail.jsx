@@ -117,22 +117,22 @@ export default function TimetableDetail() {
     ? timetable.breaks.split(',').map(b => parseInt(b, 10)) 
     : [];
 
+  const startTimeStr = timetable.startTime || '08:30';
+  const parts = startTimeStr.split(':');
+  const startHour = isNaN(parseInt(parts[0], 10)) ? 8 : parseInt(parts[0], 10);
+  const startMin = isNaN(parseInt(parts[1], 10)) ? 30 : parseInt(parts[1], 10);
+  const duration = timetable.slotDuration || 60;
+
+  const formatTime = (totalMinutes) => {
+    const hours = Math.floor(totalMinutes / 60) % 24;
+    const mins = totalMinutes % 60;
+    return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+  };
+
   const getTimeForPeriod = (pIndex) => {
-    const times = {
-      1: '08:30 - 09:30',
-      2: '09:30 - 10:30',
-      3: '10:45 - 11:45',
-      4: '11:45 - 12:45',
-      5: '13:30 - 14:30',
-      6: '14:30 - 15:30',
-      7: '15:30 - 16:30',
-      8: '16:30 - 17:30',
-      9: '17:30 - 18:30',
-      10: '18:30 - 19:30'
-    };
-    if (times[pIndex]) return times[pIndex];
-    const hr = 8 + pIndex;
-    return `${String(hr).padStart(2, '0')}:30 - ${String(hr + 1).padStart(2, '0')}:30`;
+    const startTotalMinutes = startHour * 60 + startMin + (pIndex - 1) * duration;
+    const endTotalMinutes = startTotalMinutes + duration;
+    return `${formatTime(startTotalMinutes)} - ${formatTime(endTotalMinutes)}`;
   };
 
   const slots = [];

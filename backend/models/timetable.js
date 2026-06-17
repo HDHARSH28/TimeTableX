@@ -48,6 +48,16 @@ const Timetable = sequelize.define('Timetable', {
     type: DataTypes.STRING,
     allowNull: false,
     defaultValue: ''
+  },
+  startTime: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: '08:30'
+  },
+  slotDuration: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 60
   }
 });
 

@@ -6,7 +6,7 @@ const { generateTimetableSchedule } = require('../services/optimizerService');
 // @access  Private/Admin
 const generateTimetable = async (req, res, next) => {
   try {
-    const { name, departmentId, semester, academicYear, workingDays, slotsPerDay, breaks } = req.body;
+    const { name, departmentId, semester, academicYear, workingDays, slotsPerDay, breaks, startTime, slotDuration } = req.body;
 
     if (!name || !departmentId || !semester || !academicYear) {
       return res.status(400).json({
@@ -18,6 +18,8 @@ const generateTimetable = async (req, res, next) => {
     const finalWorkingDays = workingDays || '1,2,3,4,5';
     const finalSlotsPerDay = slotsPerDay ? parseInt(slotsPerDay, 10) : 6;
     const finalBreaks = breaks || '';
+    const finalStartTime = startTime || '08:30';
+    const finalSlotDuration = slotDuration ? parseInt(slotDuration, 10) : 60;
 
     // 1. Check if department exists
     const dept = await Department.findByPk(departmentId);
@@ -228,7 +230,9 @@ const generateTimetable = async (req, res, next) => {
       status: 'draft',
       workingDays: finalWorkingDays,
       slotsPerDay: finalSlotsPerDay,
-      breaks: finalBreaks
+      breaks: finalBreaks,
+      startTime: finalStartTime,
+      slotDuration: finalSlotDuration
     });
 
     // 8. Create TimetableEntries
@@ -391,6 +395,23 @@ const exportTimetable = async (req, res, next) => {
     let csv = 'Day,Slot,Subject Code,Subject Name,Faculty,Classroom\n';
     const dayNames = ['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
+    const parts = (timetable.startTime || '08:30').split(':');
+    const startHour = isNaN(parseInt(parts[0], 10)) ? 8 : parseInt(parts[0], 10);
+    const startMin = isNaN(parseInt(parts[1], 10)) ? 30 : parseInt(parts[1], 10);
+    const duration = timetable.slotDuration || 60;
+
+    const formatTime = (totalMinutes) => {
+      const hours = Math.floor(totalMinutes / 60) % 24;
+      const mins = totalMinutes % 60;
+      return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`;
+    };
+
+    const getTimeForPeriod = (pIndex) => {
+      const startTotalMinutes = startHour * 60 + startMin + (pIndex - 1) * duration;
+      const endTotalMinutes = startTotalMinutes + duration;
+      return `${formatTime(startTotalMinutes)} - ${formatTime(endTotalMinutes)}`;
+    };
+
     // Sort entries by day and slot index
     const sortedEntries = [...timetable.TimetableEntries].sort((a, b) => {
       if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
@@ -399,7 +420,7 @@ const exportTimetable = async (req, res, next) => {
 
     sortedEntries.forEach(entry => {
       const day = dayNames[entry.dayOfWeek] || entry.dayOfWeek;
-      const slot = `Period ${entry.slotIndex}`;
+      const slot = `Period ${entry.slotIndex} (${getTimeForPeriod(entry.slotIndex)})`;
       const code = entry.Subject ? (entry.Subject.code + (entry.batch ? `: ${entry.batch}` : '')) : 'N/A';
       const subject = entry.Subject ? entry.Subject.name : 'N/A';
       const faculty = entry.Faculty ? entry.Faculty.name : 'N/A';
