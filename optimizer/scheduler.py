@@ -48,7 +48,34 @@ def solve_timetable(request: OptimizeRequest) -> OptimizeResponse:
                             x[(s.id, l, d, h, r.id)] = model.NewBoolVar(var_name)
                         
     # 3. Add Constraints
-    
+
+    # Pre-flight check: detect lessons with zero valid (day, slot, room) combinations.
+    # If we silently skip adding Constraint 1 for such a lesson the solver will
+    # report "optimal" while the lesson is simply absent — a very bad failure mode.
+    unplaceable = []
+    for s in subjects:
+        for l in range(s.classesPerWeek):
+            has_any_var = any(
+                (s.id, l, d, h, r.id) in x
+                for d in working_days_list
+                for h in range(1, slots_per_day + 1)
+                for r in classrooms
+            )
+            if not has_any_var:
+                unplaceable.append(f"'{s.name}' (id={s.id}, lesson {l + 1}/{s.classesPerWeek})")
+
+    if unplaceable:
+        lesson_list = "; ".join(unplaceable)
+        return OptimizeResponse(
+            status="infeasible",
+            schedule=[],
+            message=(
+                f"Cannot place {len(unplaceable)} lesson(s) — no valid (day, slot, room) "
+                f"combination exists for: {lesson_list}. "
+                "Check faculty availability, break slots, and room-type requirements."
+            )
+        )
+
     # Constraint 1: Each lesson must be scheduled exactly once
     for s in subjects:
         for l in range(s.classesPerWeek):
@@ -59,8 +86,8 @@ def solve_timetable(request: OptimizeRequest) -> OptimizeResponse:
                 for r in classrooms
                 if (s.id, l, d, h, r.id) in x
             ]
-            if active_vars:
-                model.Add(sum(active_vars) == 1)
+            # active_vars is guaranteed non-empty here (pre-flight passed)
+            model.Add(sum(active_vars) == 1)
             
     # Constraint 2: Classroom Clash - At most one lesson in a classroom per slot
     for d in working_days_list:
@@ -97,9 +124,23 @@ def solve_timetable(request: OptimizeRequest) -> OptimizeResponse:
                         model.Add(sum(active_vars) <= 1)
                     
     # Constraint 4: Batch Clash & Cohort Clash
-    # Ensure no single student batch (B1, B2, B3) has more than one lesson in a slot.
-    # If a theory/tutorial class (which takes the whole cohort) is scheduled, no batch classes can be scheduled.
+    # Ensure no individual batch (B1, B2, … B{n}) has more than one lesson in a slot.
+    # If a theory/tutorial class (which takes the whole cohort) is scheduled,
+    # no batch classes can be scheduled in the same slot.
+    #
+    # Batch subject IDs are encoded as:  original_id * 10000 + batch_number  (rem 1-9999)
+    # Co-faculty split IDs are encoded as: original_id * 10000 + 10 + idx     (rem >= 10)
+    # We discover the actual batch numbers dynamically from the subject list.
     cohorts = set((s.departmentId, s.semester) for s in subjects)
+
+    # Collect all unique batch numbers that appear in the subject list.
+    all_batch_nums: set = set()
+    for s in subjects:
+        if s.id >= 10000:
+            rem = s.id % 10000
+            if 1 <= rem <= 9:  # rem >= 10 are co-faculty splits, not batches
+                all_batch_nums.add(rem)
+
     for d in working_days_list:
         for h in range(1, slots_per_day + 1):
             if h in breaks_list:
@@ -108,17 +149,17 @@ def solve_timetable(request: OptimizeRequest) -> OptimizeResponse:
                 cohort_subjects = [s for s in subjects if s.departmentId == dept_id and s.semester == sem]
                 if cohort_subjects:
                     cohort_wide_vars = []
-                    batch_vars = {1: [], 2: [], 3: []}
-                    
+                    batch_vars: dict = {b: [] for b in all_batch_nums}
+
                     for s in cohort_subjects:
                         is_batch = False
                         batch_num = 0
                         if s.id >= 10000:
                             rem = s.id % 10000
-                            if 1 <= rem <= 3:
+                            if rem in all_batch_nums:
                                 is_batch = True
                                 batch_num = rem
-                        
+
                         for l in range(s.classesPerWeek):
                             for r in classrooms:
                                 if (s.id, l, d, h, r.id) in x:
@@ -126,11 +167,15 @@ def solve_timetable(request: OptimizeRequest) -> OptimizeResponse:
                                         batch_vars[batch_num].append(x[(s.id, l, d, h, r.id)])
                                     else:
                                         cohort_wide_vars.append(x[(s.id, l, d, h, r.id)])
-                    
-                    for b in [1, 2, 3]:
+
+                    for b in all_batch_nums:
                         active_terms = cohort_wide_vars + batch_vars[b]
                         if active_terms:
                             model.Add(sum(active_terms) <= 1)
+
+                    # If there are no batches at all, still enforce cohort-wide clash
+                    if not all_batch_nums and cohort_wide_vars:
+                        model.Add(sum(cohort_wide_vars) <= 1)
                     
     # Constraint 5: Faculty Daily Workload Limit
     for d in working_days_list:

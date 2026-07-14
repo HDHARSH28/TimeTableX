@@ -22,6 +22,7 @@ export default function Timetables() {
   const [breaks, setBreaks] = useState('');
   const [startTime, setStartTime] = useState('08:30');
   const [slotDuration, setSlotDuration] = useState(60);
+  const [numBatches, setNumBatches] = useState(3);
 
   const dayOptions = [
     { value: '1', label: 'Mon' },
@@ -75,6 +76,7 @@ export default function Timetables() {
     setBreaks('');
     setStartTime('08:30');
     setSlotDuration(60);
+    setNumBatches(3);
     setError('');
     setIsModalOpen(true);
   };
@@ -86,6 +88,12 @@ export default function Timetables() {
 
     if (!name || !departmentId || !semester || !academicYear) {
       setError('Please provide all details.');
+      return;
+    }
+
+    const parsedBatches = parseInt(numBatches, 10);
+    if (isNaN(parsedBatches) || parsedBatches < 1 || parsedBatches > 9) {
+      setError('Number of lab batches must be between 1 and 9.');
       return;
     }
 
@@ -109,7 +117,8 @@ export default function Timetables() {
         slotsPerDay: parseInt(slotsPerDay, 10),
         breaks,
         startTime,
-        slotDuration: parseInt(slotDuration, 10)
+        slotDuration: parseInt(slotDuration, 10),
+        numBatches: parseInt(numBatches, 10)
       });
       setSuccess('Timetable optimized and created successfully!');
       setIsModalOpen(false);
@@ -433,6 +442,23 @@ export default function Timetables() {
                     onChange={(e) => setBreaks(e.target.value)}
                   />
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="tt-batches">Lab Batches per Subject</label>
+                <input
+                  type="number"
+                  id="tt-batches"
+                  className="form-control"
+                  min="1"
+                  max="9"
+                  value={numBatches}
+                  onChange={(e) => setNumBatches(e.target.value)}
+                  required
+                />
+                <p style={{ marginTop: '6px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                  Lab and "both" type subjects will be split into this many parallel batches (e.g. 3 → B1, B2, B3). Max 9.
+                </p>
               </div>
 
               <div style={{ marginTop: '10px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>

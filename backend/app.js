@@ -1,5 +1,7 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 
 const { sequelize } = require('./models');
@@ -17,17 +19,42 @@ const importRoutes = require('./routes/importRoutes');
 
 const app = express();
 
-// Middlewares
+// ── Security headers ──────────────────────────────────────────────────────────
+app.use(helmet());
+
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Strict limiter on auth endpoints (brute-force protection)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+
+// General API limiter for all other routes
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+
+app.use('/api/auth', authLimiter);
+app.use('/api', apiLimiter);
+
+// ── Body parsing ──────────────────────────────────────────────────────────────
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Test Database Connection
+// ── Database ──────────────────────────────────────────────────────────────────
 sequelize.authenticate()
   .then(() => console.log('PostgreSQL database connected successfully via Sequelize.'))
   .catch(err => console.error('Database connection error:', err));
 
-// Routes mount
+// ── Routes ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/departments', departmentRoutes);
 app.use('/api/faculty', facultyRoutes);
@@ -42,7 +69,7 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to TimeTableX Smart Timetable Optimization System API' });
 });
 
-// Error handling middleware
+// ── Error handling ────────────────────────────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;

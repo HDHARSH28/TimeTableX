@@ -1,4 +1,4 @@
-const { Timetable, TimetableEntry, Subject, Faculty, Classroom, Department } = require('../models');
+const { Timetable, TimetableEntry, Subject, Faculty, Classroom, Department, sequelize } = require('../models');
 const { generateTimetableSchedule } = require('../services/optimizerService');
 
 // @desc    Generate optimized timetable
@@ -6,7 +6,7 @@ const { generateTimetableSchedule } = require('../services/optimizerService');
 // @access  Private/Admin
 const generateTimetable = async (req, res, next) => {
   try {
-    const { name, departmentId, semester, academicYear, workingDays, slotsPerDay, breaks, startTime, slotDuration } = req.body;
+    const { name, departmentId, semester, academicYear, workingDays, slotsPerDay, breaks, startTime, slotDuration, numBatches } = req.body;
 
     if (!name || !departmentId || !semester || !academicYear) {
       return res.status(400).json({
@@ -20,6 +20,9 @@ const generateTimetable = async (req, res, next) => {
     const finalBreaks = breaks || '';
     const finalStartTime = startTime || '08:30';
     const finalSlotDuration = slotDuration ? parseInt(slotDuration, 10) : 60;
+    // Co-faculty split IDs use rem = 10 + idx, so batch numbers must stay ≤ 9
+    // to avoid subject-ID collisions with that encoding.
+    const finalNumBatches = numBatches ? Math.min(9, Math.max(1, parseInt(numBatches, 10))) : 3;
 
     // 1. Check if department exists
     const dept = await Department.findByPk(departmentId);
@@ -71,22 +74,44 @@ const generateTimetable = async (req, res, next) => {
       if (s.type === 'both') {
         const theoryClasses = Math.ceil(s.classesPerWeek / 2);
         const labClasses = s.classesPerWeek - theoryClasses;
-        
-        // 1. Push Theory part
-        optimizerSubjects.push({
-          id: s.id, // Original ID representing the theory part
-          name: `${s.name} (Theory)`,
-          code: s.code,
-          classesPerWeek: theoryClasses,
-          facultyId: assignedFaculties.length > 0 ? assignedFaculties[0].id : null,
-          departmentId: s.departmentId,
-          semester: s.semester,
-          type: 'theory'
-        });
 
-        // 2. Push Lab part (B1, B2, B3)
+        // 1. Push Theory part — split across co-faculty consistently with pure-theory logic
+        if (assignedFaculties.length <= 1) {
+          optimizerSubjects.push({
+            id: s.id,
+            name: `${s.name} (Theory)`,
+            code: s.code,
+            classesPerWeek: theoryClasses,
+            facultyId: assignedFaculties.length === 1 ? assignedFaculties[0].id : null,
+            departmentId: s.departmentId,
+            semester: s.semester,
+            type: 'theory'
+          });
+        } else {
+          // Multiple co-faculty: distribute theoryClasses proportionally
+          const F = assignedFaculties.length;
+          const baseClasses = Math.floor(theoryClasses / F);
+          const remainder = theoryClasses % F;
+          assignedFaculties.forEach((fac, idx) => {
+            const facClasses = baseClasses + (idx < remainder ? 1 : 0);
+            if (facClasses > 0) {
+              optimizerSubjects.push({
+                id: s.id * 10000 + 10 + idx, // same co-faculty split encoding as pure theory
+                name: `${s.name} (Theory – ${fac.name})`,
+                code: s.code,
+                classesPerWeek: facClasses,
+                facultyId: fac.id,
+                departmentId: s.departmentId,
+                semester: s.semester,
+                type: 'theory'
+              });
+            }
+          });
+        }
+
+        // 2. Push Lab part (B1 … B{numBatches})
         if (labClasses > 0) {
-          for (let b = 1; b <= 3; b++) {
+          for (let b = 1; b <= finalNumBatches; b++) {
             const fac = assignedFaculties.length > 0 
               ? assignedFaculties[(b - 1) % assignedFaculties.length] 
               : null;
@@ -104,8 +129,8 @@ const generateTimetable = async (req, res, next) => {
           }
         }
       } else if (s.type === 'lab') {
-        // Generate 3 batches: B1, B2, B3
-        for (let b = 1; b <= 3; b++) {
+        // Generate B1 … B{numBatches} batches
+        for (let b = 1; b <= finalNumBatches; b++) {
           const fac = assignedFaculties.length > 0 
             ? assignedFaculties[(b - 1) % assignedFaculties.length] 
             : null;
@@ -221,21 +246,9 @@ const generateTimetable = async (req, res, next) => {
       });
     }
 
-    // 7. Create Timetable record
-    const timetable = await Timetable.create({
-      name,
-      departmentId,
-      semester,
-      academicYear,
-      status: 'draft',
-      workingDays: finalWorkingDays,
-      slotsPerDay: finalSlotsPerDay,
-      breaks: finalBreaks,
-      startTime: finalStartTime,
-      slotDuration: finalSlotDuration
-    });
-
-    // 8. Create TimetableEntries
+    // 7 & 8. Persist Timetable + TimetableEntries atomically.
+    // If bulkCreate fails (bad FK, connection blip, etc.) the transaction rolls
+    // back so we never end up with an orphaned Timetable row that has no entries.
     const timetableEntries = optimizationResult.schedule.map(entry => {
       let originalSubjectId = entry.subject_id;
       let batch = null;
@@ -243,37 +256,58 @@ const generateTimetable = async (req, res, next) => {
       if (entry.subject_id >= 10000) {
         originalSubjectId = Math.floor(entry.subject_id / 10000);
         const rem = entry.subject_id % 10000;
-        if (rem >= 1 && rem <= 3) {
+        // A rem in [1..finalNumBatches] encodes a lab batch; higher values
+        // (10, 11, …) encode co-faculty splits and carry no batch label.
+        if (rem >= 1 && rem <= finalNumBatches) {
           batch = `B${rem}`;
         }
       }
 
       return {
-        timetableId: timetable.id,
         subjectId: originalSubjectId,
         facultyId: entry.faculty_id,
         classroomId: entry.classroom_id,
         dayOfWeek: entry.day_of_week,
         slotIndex: entry.slot_index,
-        batch: batch
+        batch
       };
     });
 
-    await TimetableEntry.bulkCreate(timetableEntries);
-
-    // 9. Fetch saved complete timetable
-    const completeTimetable = await Timetable.findByPk(timetable.id, {
-      include: [
-        { model: Department, attributes: ['id', 'name', 'code'] },
+    let completeTimetable;
+    await sequelize.transaction(async (t) => {
+      const timetable = await Timetable.create(
         {
-          model: TimetableEntry,
-          include: [
-            { model: Subject, attributes: ['id', 'name', 'code'] },
-            { model: Faculty, attributes: ['id', 'name', 'email'] },
-            { model: Classroom, attributes: ['id', 'name', 'capacity', 'type'] }
-          ]
-        }
-      ]
+          name,
+          departmentId,
+          semester,
+          academicYear,
+          status: 'draft',
+          workingDays: finalWorkingDays,
+          slotsPerDay: finalSlotsPerDay,
+          breaks: finalBreaks,
+          startTime: finalStartTime,
+          slotDuration: finalSlotDuration
+        },
+        { transaction: t }
+      );
+
+      const entriesWithId = timetableEntries.map(e => ({ ...e, timetableId: timetable.id }));
+      await TimetableEntry.bulkCreate(entriesWithId, { transaction: t });
+
+      completeTimetable = await Timetable.findByPk(timetable.id, {
+        transaction: t,
+        include: [
+          { model: Department, attributes: ['id', 'name', 'code'] },
+          {
+            model: TimetableEntry,
+            include: [
+              { model: Subject, attributes: ['id', 'name', 'code'] },
+              { model: Faculty, attributes: ['id', 'name', 'email'] },
+              { model: Classroom, attributes: ['id', 'name', 'capacity', 'type'] }
+            ]
+          }
+        ]
+      });
     });
 
     res.status(201).json({
@@ -418,6 +452,9 @@ const exportTimetable = async (req, res, next) => {
       return a.slotIndex - b.slotIndex;
     });
 
+    // RFC 4180: escape embedded double-quotes by doubling them.
+    const csvEscape = (val) => String(val ?? '').replace(/"/g, '""');
+
     sortedEntries.forEach(entry => {
       const day = dayNames[entry.dayOfWeek] || entry.dayOfWeek;
       const slot = `Period ${entry.slotIndex} (${getTimeForPeriod(entry.slotIndex)})`;
@@ -425,7 +462,7 @@ const exportTimetable = async (req, res, next) => {
       const subject = entry.Subject ? entry.Subject.name : 'N/A';
       const faculty = entry.Faculty ? entry.Faculty.name : 'N/A';
       const classroom = entry.Classroom ? entry.Classroom.name : 'N/A';
-      csv += `"${day}","${slot}","${code}","${subject}","${faculty}","${classroom}"\n`;
+      csv += `"${csvEscape(day)}","${csvEscape(slot)}","${csvEscape(code)}","${csvEscape(subject)}","${csvEscape(faculty)}","${csvEscape(classroom)}"\n`;
     });
 
     res.setHeader('Content-Type', 'text/csv');

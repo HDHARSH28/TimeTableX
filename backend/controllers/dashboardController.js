@@ -10,20 +10,35 @@ const getDashboardAnalytics = async (req, res, next) => {
     const subjectCount = await Subject.count();
     const timetableCount = await Timetable.count();
 
-    // Classroom utilization calculations
-    // Assuming a standard timetable has 5 days * 6 slots = 30 total available slots per room
+    // Classroom utilization calculations.
+    // We derive the real number of available slots per timetable from its stored
+    // workingDays and slotsPerDay, subtracting break periods so the denominator
+    // is always accurate regardless of per-timetable configuration.
     const classrooms = await Classroom.findAll({ order: [['name', 'ASC']] });
+    const timetables = await Timetable.findAll({ attributes: ['id', 'workingDays', 'slotsPerDay', 'breaks'] });
     const classroomStats = [];
 
+    // Compute total available (non-break) slots across ALL timetables.
+    const totalAvailableSlots = timetables.reduce((sum, tt) => {
+      const workingDayCount = tt.workingDays
+        ? tt.workingDays.split(',').filter(Boolean).length
+        : 5;
+      const slotsPerDay = tt.slotsPerDay || 6;
+      const breakCount = tt.breaks
+        ? tt.breaks.split(',').filter(Boolean).length
+        : 0;
+      return sum + workingDayCount * (slotsPerDay - breakCount);
+    }, 0);
+
+    // Guard against divide-by-zero when no timetables exist yet.
+    const divisor = totalAvailableSlots || 1;
+
     for (const room of classrooms) {
-      // Count total scheduled slots for this room across all timetables
+      // Count total scheduled slots for this room across all timetables.
       const entryCount = await TimetableEntry.count({
         where: { classroomId: room.id }
       });
 
-      // Compute occupancy. If there are multiple timetables, each timetable has 30 slots.
-      // So total available slots = 30 * timetableCount
-      const divisor = 30 * (timetableCount || 1);
       const utilizationRate = Math.min((entryCount / divisor) * 100, 100).toFixed(1);
 
       classroomStats.push({

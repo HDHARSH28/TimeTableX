@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from models import OptimizeRequest, OptimizeResponse
@@ -9,11 +10,22 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Enable CORS for communication
+# CORS configuration.
+# Set ALLOWED_ORIGINS in the environment as a comma-separated list of origins, e.g.:
+#   ALLOWED_ORIGINS=http://localhost:5173,https://your-prod-domain.com
+# Wildcard ("*") + allow_credentials=True is rejected by browsers and violates
+# the CORS spec, so we never combine them.
+_raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173,http://localhost:3000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+
+# Credentials (cookies / Authorization headers) are only meaningful when a
+# specific origin is listed — never with the "*" wildcard.
+_allow_credentials = "*" not in ALLOWED_ORIGINS
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )
