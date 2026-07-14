@@ -401,10 +401,3 @@ pytest test_scheduler.py -v
 | `SequelizeConnectionError` | Check `DB_*` values in `backend/.env` and ensure PostgreSQL is running |
 | `infeasible` optimization result | Too many constraints for the given time slots — reduce `classesPerWeek`, add more classrooms, or increase `slotsPerDay` |
 
----
-
-<div align="center">
-
-Made with ☕ and constraint programming
-
-</div>
